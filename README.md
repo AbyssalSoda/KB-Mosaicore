@@ -1,3 +1,6 @@
+## SynthScrape GUI Notes
+All modifications to code will be marked with the keyword: Abyssal Modifications
+
 ## KoboldAI - Your gateway to GPT writing
 
 This is a browser-based front-end for AI-assisted writing with multiple local & remote AI models. It offers the standard array of tools, including Memory, Author's Note, World Info, Save & Load, adjustable AI settings, formatting options, and the ability to import existing AI Dungeon adventures. You can also turn on Adventure mode and play the game like AI Dungeon Unleashed.
