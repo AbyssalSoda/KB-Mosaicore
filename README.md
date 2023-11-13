@@ -1,4 +1,4 @@
-## SynthScrape GUI Notes
+## KB-SynthScrape GUI Notes
 All modifications to code will be marked with the keyword: Abyssal Modifications
 
 ## KoboldAI - Your gateway to GPT writing
