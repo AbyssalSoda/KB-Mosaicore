@@ -273,6 +273,7 @@ model_menu = {
         MenuModel("Read Only (No AI)", "ReadOnly", model_type=MenuModelType.OTHER, model_backend="Read Only"),
     ],
     'instructlist': [
+        MenuModel("Tiefighter 13B", "KoboldAI/LLaMA2-13B-Tiefighter", "12GB*"),   
         MenuModel("Holomax 13B", "KoboldAI/LLaMA2-13B-Holomax", "12GB*"),        
         MenuModel("Mythomax 13B", "Gryphe/MythoMax-L2-13b", "12GB*"),
         MenuModel("Chronos-Hermes V2 13B", "Austism/chronos-hermes-13b-v2", "12GB*"),
@@ -283,6 +284,7 @@ model_menu = {
         ],
     'adventurelist': [
         MenuFolder("Instruct models may perform better than the models below (Using Instruct mode)", "instructlist"),
+        MenuModel("Tiefighter 13B (Instruct Hybrid)", "KoboldAI/LLaMA2-13B-Tiefighter", "12GB*"),
         MenuModel("Skein 20B", "KoboldAI/GPT-NeoX-20B-Skein", "20GB*"),
         MenuModel("Nerys OPT 13B V2 (Hybrid)", "KoboldAI/OPT-13B-Nerys-v2", "12GB"),
         MenuModel("Spring Dragon 13B", "Henk717/spring-dragon", "12GB*"),
@@ -298,6 +300,7 @@ model_menu = {
         MenuFolder("Return to Main Menu", "mainmenu"),
         ],
     'novellist': [
+        MenuModel("Tiefighter 13B (Instruct Hybrid)", "KoboldAI/LLaMA2-13B-Tiefighter", "12GB*"),
         MenuModel("Nerys OPT 13B V2 (Hybrid)", "KoboldAI/OPT-13B-Nerys-v2", "32GB"),
         MenuModel("Nerys FSD 13B V2 (Hybrid)", "KoboldAI/fairseq-dense-13B-Nerys-v2", "32GB"),
         MenuModel("Janeway FSD 13B", "KoboldAI/fairseq-dense-13B-Janeway", "32GB"),
@@ -1474,7 +1477,7 @@ def general_startup(override_args=None):
     parser.add_argument("--cacheonly", action='store_true', help="Does not save the model to the models folder when it has been downloaded in the cache")
     parser.add_argument("--customsettings", help="Preloads arguements from json file. You only need to provide the location of the json file. Use customsettings.json template file. It can be renamed if you wish so that you can store multiple configurations. Leave any settings you want as default as null. Any values you wish to set need to be in double quotation marks")
     parser.add_argument("--no_ui", action='store_true', default=False, help="Disables the GUI and Socket.IO server while leaving the API server running.")
-    parser.add_argument("--summarizer_model", action='store', default="pszemraj/led-large-book-summary", help="Huggingface model to use for summarization. Defaults to pszemraj/led-large-book-summary")
+    parser.add_argument("--summarizer_model", action='store', default="philschmid/bart-large-cnn-samsum", help="Huggingface model to use for summarization. Defaults to sshleifer/distilbart-cnn-12-6")
     parser.add_argument("--max_summary_length", action='store', default=75, help="Maximum size for summary to send to image generation")
     parser.add_argument("--multi_story", action='store_true', default=False, help="Allow multi-story mode (experimental)")
     parser.add_argument("--peft", type=str, help="Specify the path or HuggingFace ID of a Peft to load it. Not supported on TPU. (Experimental)") 
@@ -1931,15 +1934,12 @@ def download():
         save.headers.set('Content-Disposition', 'attachment', filename='%s.txt' % filename)
         return(save)
     
-    
-    
     save = Response(koboldai_vars.download_story())
     filename = path.basename(koboldai_vars.savedir)
     if filename[-5:] == ".json":
         filename = filename[:-5]
     save.headers.set('Content-Disposition', 'attachment', filename='%s.json' % filename)
     return(save)
-
 
 #============================ LUA API =============================#
 _bridged = {}
@@ -7583,11 +7583,8 @@ def text2img_api(prompt, art_guide="") -> Image.Image:
 @socketio.on("clear_generated_image")
 @logger.catch
 def UI2_clear_generated_image(data):
-    if 'action_id' in data and data['action_id'] is not None:
-        koboldai_vars.actions.clear_picture(data['action_id'])
-    else:
-        koboldai_vars.picture = ""
-        koboldai_vars.picture_prompt = ""
+    koboldai_vars.picture = ""
+    koboldai_vars.picture_prompt = ""
 
 #==================================================================#
 # Retrieve previous images
@@ -7600,9 +7597,7 @@ def UI_2_get_story_image(data):
     print(filename)
     if filename is not None:
         with open(filename, "rb") as image_file:
-            return {'img': base64.b64encode(image_file.read()).decode("utf-8"), 'action_id': action_id}
-    else:
-        return {'img': None, 'action_id': action_id}
+            return base64.b64encode(image_file.read()).decode("utf-8") 
 
 #@logger.catch
 def get_items_locations_from_text(text):
@@ -7653,19 +7648,16 @@ def get_items_locations_from_text(text):
 #==================================================================#
 def summarize(text, max_length=100, min_length=30, unload=True):
     from transformers import pipeline as summary_pipeline
-    from transformers import AutoConfig
     start_time = time.time()
     if koboldai_vars.summarizer is None:
         if os.path.exists("functional_models/{}".format(args.summarizer_model.replace('/', '_'))):
             koboldai_vars.summary_tokenizer = AutoTokenizer.from_pretrained("functional_models/{}".format(args.summarizer_model.replace('/', '_')), cache_dir="cache")
             koboldai_vars.summarizer = AutoModelForSeq2SeqLM.from_pretrained("functional_models/{}".format(args.summarizer_model.replace('/', '_')), cache_dir="cache")
-            koboldai_vars.summary_model_config = AutoConfig.from_pretrained("functional_models/{}".format(args.summarizer_model.replace('/', '_')), cache_dir="cache")
         else:
             koboldai_vars.summary_tokenizer = AutoTokenizer.from_pretrained(args.summarizer_model, cache_dir="cache")
             koboldai_vars.summarizer = AutoModelForSeq2SeqLM.from_pretrained(args.summarizer_model, cache_dir="cache")
             koboldai_vars.summary_tokenizer.save_pretrained("functional_models/{}".format(args.summarizer_model.replace('/', '_')), max_shard_size="500MiB")
             koboldai_vars.summarizer.save_pretrained("functional_models/{}".format(args.summarizer_model.replace('/', '_')), max_shard_size="500MiB")
-            koboldai_vars.summary_model_config = AutoConfig.from_pretrained(args.summarizer_model, cache_dir="cache")
 
     #Try GPU accel
     if koboldai_vars.hascuda and torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved(0) >= 1645778560:
@@ -7679,27 +7671,9 @@ def summarize(text, max_length=100, min_length=30, unload=True):
     #Actual sumarization
     start_time = time.time()
     #make sure text is less than 1024 tokens, otherwise we'll crash
-    max_tokens = koboldai_vars.summary_model_config.max_encoder_position_embeddings if hasattr(koboldai_vars.summary_model_config, 'max_encoder_position_embeddings') else 1024
-    logger.info("Using max summary tokens of {}".format(max_tokens))
-    if len(koboldai_vars.summary_tokenizer.encode(text)) > max_tokens:
-        text_list = koboldai_vars.actions.sentence_re.findall(text)
-        i=0
-        while i <= len(text_list)-2:
-            if len(koboldai_vars.summary_tokenizer.encode(text_list[i] + text_list[i+1])) < max_tokens:
-                text_list[i] = text_list[i] + text_list[i+1]
-                del text_list[i+1]
-            else:
-                i+=1
-                    
-        
-    else:
-        text_list = [text]
-    
-    output = []
-    logger.info("Summarizing with {} chunks of length {}".format(len(text_list), [len(koboldai_vars.summary_tokenizer.encode(x)) for x in text_list]))
-    for text in text_list:
-        output.append(tpool.execute(summarizer, text, max_length=max_length, min_length=min_length, do_sample=False)[0]['summary_text'])
-    output = " ".join(output)
+    if len(koboldai_vars.summary_tokenizer.encode(text)) > 1000:
+        text = koboldai_vars.summary_tokenizer.decode(koboldai_vars.summary_tokenizer.encode(text)[:1000])
+    output = tpool.execute(summarizer, text, max_length=max_length, min_length=min_length, do_sample=False)[0]['summary_text']
     logger.debug("Time to summarize: {}".format(time.time()-start_time))
     #move model back to CPU to save precious vram
     torch.cuda.empty_cache()
@@ -7719,33 +7693,40 @@ def summarize(text, max_length=100, min_length=30, unload=True):
 @socketio.on("refresh_auto_memory")
 @logger.catch
 def UI_2_refresh_auto_memory(data):
-    max_output_length=500
-    from transformers import AutoConfig
     koboldai_vars.auto_memory = "Generating..."
     if koboldai_vars.summary_tokenizer is None:
-        if os.path.exists("functional_models/{}".format(args.summarizer_model.replace('/', '_'))):
-            koboldai_vars.summary_tokenizer = AutoTokenizer.from_pretrained("functional_models/{}".format(args.summarizer_model.replace('/', '_')), cache_dir="cache")
-            koboldai_vars.summary_model_config = AutoConfig.from_pretrained("functional_models/{}".format(args.summarizer_model.replace('/', '_')), cache_dir="cache")
+        if os.path.exists("models/{}".format(args.summarizer_model.replace('/', '_'))):
+            koboldai_vars.summary_tokenizer = AutoTokenizer.from_pretrained("models/{}".format(args.summarizer_model.replace('/', '_')), cache_dir="cache")
         else:
             koboldai_vars.summary_tokenizer = AutoTokenizer.from_pretrained(args.summarizer_model, cache_dir="cache")
-            koboldai_vars.summary_model_config = AutoConfig.from_pretrained(args.summarizer_model, cache_dir="cache")
-    max_tokens = koboldai_vars.summary_model_config.max_encoder_position_embeddings if hasattr(koboldai_vars.summary_model_config, 'max_encoder_position_embeddings') else 1024
-
-    #first, let's get all of our game text
-    sentences = "".join([x[0] for x in koboldai_vars.actions.to_sentences()])
+    #first, let's get all of our game text and split it into sentences
+    sentences = [x[0] for x in koboldai_vars.actions.to_sentences()]
+    sentences_lengths = [len(koboldai_vars.summary_tokenizer.encode(x)) for x in sentences]
     
     pass_number = 1
-    while len(koboldai_vars.summary_tokenizer.encode(sentences)) > max_tokens:
-        new_sentences = summarize(sentences, unload=False, max_length=max_output_length)
+    while len(koboldai_vars.summary_tokenizer.encode("".join(sentences))) > 1000:
+        #Now let's split them into 1000 token chunks
+        summary_chunks = [""]
+        summary_chunk_lengths = [0]
+        for i in range(len(sentences)):
+            if summary_chunk_lengths[-1] + sentences_lengths[i] <= 1000:
+                summary_chunks[-1] += sentences[i]
+                summary_chunk_lengths[-1] += sentences_lengths[i]
+            else:
+                summary_chunks.append(sentences[i])
+                summary_chunk_lengths.append(sentences_lengths[i])
+        new_sentences = []
+        i=0
+        for summary_chunk in summary_chunks:
+            logger.debug("summarizing chunk {}".format(i))
+            new_sentences.extend(re.split("(?<=[.!?])\s+", summarize(summary_chunk, unload=False)))
+            i+=1
         logger.debug("Pass {}:\nSummarized to {} sentencees from {}".format(pass_number, len(new_sentences), len(sentences)))
         sentences = new_sentences
-        koboldai_vars.auto_memory += "Pass {}:\n{}\n\n".format(pass_number, sentences)
+        koboldai_vars.auto_memory += "Pass {}:\n{}\n\n".format(pass_number, "\n".join(sentences))
         pass_number+=1
     logger.debug("OK, doing final summarization")
-    if len(koboldai_vars.summary_tokenizer.encode(sentences)) > max_output_length:
-        output = summarize(sentences, max_length=max_output_length)
-    else:
-        output = sentences
+    output = summarize(" ".join(sentences))
     koboldai_vars.auto_memory += "\n\n Final Result:\n" + output
 
 
@@ -10976,7 +10957,223 @@ class SamplerFullDeterminismSettingSchema(KoboldSchema):
 for schema in config_endpoint_schemas:
     create_config_endpoint(schema=schema.__name__, method="GET")
     create_config_endpoint(schema=schema.__name__, method="PUT")
+    
 
+#==================================================================#
+#  Abyssal Modifications - Psuedo Launcher START
+#==================================================================#
+
+
+import webbrowser
+import string
+
+json_file_name = 'browser_config.json'
+script_directory = os.path.dirname(os.path.realpath(__file__))
+json_file_directory = os.path.join(script_directory, 'KB-Mosaicore-Core')
+json_file_path = os.path.join(json_file_directory, json_file_name)
+print(f"JSON file path: {json_file_path}")
+
+def find_mosaicore_executable(executable_name="Mosaicore.exe"):
+    executable_path = os.path.join(json_file_directory, executable_name)
+    print(f"CHECKING: {executable_path}")
+    return executable_path if os.path.isfile(executable_path) else None 
+
+def get_default_data():
+    mosaicore_path = find_mosaicore_executable() or 'Path to Mosaicore not found'
+    return {
+        'browsers': [
+            {
+                'executable_path': mosaicore_path,
+                'executable_name': 'Mosaicore',
+                'status': 'selected'
+            }
+        ]
+    }
+
+    
+def get_available_drives():
+    drives = []
+    for drive_letter in string.ascii_uppercase:
+        #print(f"Checking: {drive_letter}")
+        if os.path.exists(f"{drive_letter}:\\"):
+            drives.append(f"{drive_letter}:\\")
+    return drives
+
+
+# Common browser installation paths to check on each drive
+browser_paths = [
+    r"Program Files\Google\Chrome\Application\chrome.exe",
+    r"Program Files\Mozilla Firefox\firefox.exe",
+    r"Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+    r"Program Files\Opera\launcher.exe",
+    r"Program Files\BraveSoftware\Brave-Browser\Application\brave.exe"
+]
+
+# Detect installed browsers
+def detect_browsers():
+    detected_browsers = []
+    for drive in get_available_drives():
+        for path in browser_paths:
+            full_path = os.path.join(drive, path)
+            #print(f"Checking: {full_path}")  # Print the path being checked
+            if os.path.isfile(full_path):
+                browser_name = os.path.basename(os.path.dirname(os.path.dirname(full_path)))
+                detected_browsers.append({
+                    "executable_path": full_path,
+                    "executable_name": browser_name,
+                    "status": None
+                })
+                print(f"Detected: {browser_name}")  # Print detected browser
+    return detected_browsers
+    
+
+
+def ensure_default_file_exists():
+    # Ensure the directory exists
+    if not os.path.exists(json_file_directory):
+        os.makedirs(json_file_directory)
+
+    # Check and create file if necessary
+    if not os.path.exists(json_file_path) or os.path.getsize(json_file_path) == 0:
+        default_data = get_default_data()
+        detected_browsers = detect_browsers()  # Detect installed browsers
+
+        # Add detected browsers to the default data
+        for browser in detected_browsers:
+            if not any(b['executable_name'] == browser['executable_name'] for b in default_data['browsers']):
+                default_data['browsers'].append(browser)
+
+        with open(json_file_path, 'w') as file:
+            json.dump(default_data, file, indent=4)
+        print(f"Default JSON file created at {json_file_path}.")
+
+
+#Ensure Function called
+ensure_default_file_exists()
+
+def get_user_browser_choice():
+    global json_file_path
+    print(f"get_user_browser_choice - Checking JSON file at: {json_file_path}")
+    try:
+        with open(json_file_path, 'r') as file:
+            data = json.load(file)
+            for browser in data['browsers']:
+                if browser['status'] == 'selected':
+                    return browser['executable_name']
+            return 'Mosaicore'  # Default to Mosaicore if no browser is selected
+    except FileNotFoundError:
+        print("No File Found - Default Browser Enabled")
+        return 'Mosaicore'  # Default to Mosaicore if the file doesn't exist
+
+
+def open_in_browser(url, port):
+    global json_file_path
+    print(f"open_in_browser - Checking JSON file at: {json_file_path}")
+    try:
+        with open(json_file_path, 'r') as file:
+            data = json.load(file)
+            browser_path = next((b['executable_path'] for b in data['browsers'] if b['executable_name'] == "Mosaicore"), None)
+
+            if browser_path:
+                # Check if the path is valid
+                if os.path.isfile(browser_path):
+                    # Open the URL using the absolute path of the browser executable
+                    os.system(f'"{browser_path}" {url.format(port)}')
+                else:
+                    print(f"Executable path for Mosaicore not found: {browser_path}")
+            else:
+                print(f"Mosaicore path not found in JSON.")
+
+    except FileNotFoundError:
+        print("Executable info file not found.")
+
+
+def update_browsers_list(data):
+    mosaicore_path = find_mosaicore_executable()
+    print(f"CHECKING: {mosaicore_path}")  # Use print to output the debugging information
+    if mosaicore_path:
+        # Check if Mosaicore is already in the data
+        if not any(browser['executable_name'] == "Mosaicore" for browser in data['browsers']):
+            data['browsers'].append({
+                "executable_path": mosaicore_path,
+                "executable_name": "Mosaicore",
+                "status": None  # or 'selected' if you want it to be the default selected
+            })
+
+    # Add other detected browsers
+    for browser in detect_browsers():
+        if not any(b['executable_name'] == browser['executable_name'] for b in data['browsers']):
+            data['browsers'].append(browser)
+    return data
+
+
+def read_json(json_file_path):
+    if os.path.exists(json_file_path) and os.path.getsize(json_file_path) > 0:
+        with open(json_file_path, 'r') as file:
+            return json.load(file)
+    else:
+        default_data = get_default_data()
+        with open(json_file_path, 'w') as file:
+            json.dump(default_data, file, indent=4)
+        return default_data
+
+
+def write_json(data, json_file_path):
+    try:
+        with open(json_file_path, 'w') as file:
+            json.dump(data, file, indent=4)
+        print("JSON data successfully written to file.")
+    except PermissionError as e:
+        print(f"Permission error: {e}")
+    except Exception as e:
+        print(f"Unexpected error while writing JSON: {e}")
+
+
+def extract_executable_name(path):
+    base = os.path.basename(path)
+    return os.path.splitext(base)[0]
+
+
+@app.route('/', methods=['GET', 'POST'])
+def indexx():
+    global json_file_path
+    data = read_json(json_file_path)  # Read the existing data
+    data = update_browsers_list(data)  # Update the data with detected browsers
+    write_json(data, json_file_path)  # Immediately write the updated data back to the file
+
+    if request.method == 'POST':
+        browser_choice = request.form.get('browser')
+        data = read_json(json_file_path)  # Re-read the data to get the latest updates
+
+        # Update the status of all browsers to null initially
+        for browser in data['browsers']:
+            browser['status'] = None
+
+        if browser_choice == "Custom":
+            custom_path = request.form.get('executablePath')
+            if custom_path:
+                executable_name = extract_executable_name(custom_path)
+                custom_browser = {
+                    "executable_path": custom_path,
+                    "executable_name": executable_name,
+                    "status": "selected"
+                }
+                data['browsers'].append(custom_browser)
+        else:
+            # Find the selected browser and update its status
+            for browser in data['browsers']:
+                if browser['executable_name'] == browser_choice:
+                    browser['status'] = "selected"
+                    break
+
+        write_json(data, json_file_path)  # Write the updated data back to the file after POST handling
+
+    return render_template('settings flyout.html', data=read_json(json_file_path))  
+
+
+#==================================================================#
+#  Abyssal Modifications - Psuedo Launcher END
+#==================================================================#
 
 #==================================================================#
 #  Final startup commands to launch Flask app
@@ -11068,10 +11265,13 @@ def run():
         if args.unblock:
             if not args.no_ui:
                 try:
-                    import webbrowser
-                    webbrowser.open_new('http://localhost:{0}'.format(port))
-                except:
+         
+                    #  Abyssal Modifications - Psuedo Launcher
+                    open_in_browser('http://localhost:{0}', port)
+                except Exception as e:
+                    print("Error trying to open the web browser:", e)
                     pass
+                    
             logger.init_ok("Webserver", status="OK")
             logger.message(f"Webserver started! You may now connect with a browser at http://127.0.0.1:{port}")
             koboldai_vars.serverstarted = True
@@ -11079,10 +11279,12 @@ def run():
         else:
             if not args.no_ui:
                 try:
-                    import webbrowser
-                    webbrowser.open_new('http://localhost:{0}'.format(port))
-                except:
+                   
+                    open_in_browser('http://localhost:{0}', port)
+                except Exception as e:
+                    print("Error trying to open the web browser:", e)
                     pass
+                    #  Abyssal Modifications - Psuedo Launcher
             logger.init_ok("Webserver", status="OK")
             logger.message(f"Webserver started! You may now connect with a browser at http://127.0.0.1:{port}")
             koboldai_vars.serverstarted = True
