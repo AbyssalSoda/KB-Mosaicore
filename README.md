@@ -1,5 +1,8 @@
-## KB-SynthScrape GUI Notes
+## Mosaicore GUI Notes
 All modifications to code will be marked with the keyword: Abyssal Modifications
+
+New Default Mosaicore Browser (Dark light/System Mode supported)
+Default Browser Select (Choose what browser you want)
 
 ## KoboldAI - Your gateway to GPT writing
 
