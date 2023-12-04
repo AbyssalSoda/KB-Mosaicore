@@ -10967,19 +10967,29 @@ for schema in config_endpoint_schemas:
 import webbrowser
 import string
 
-json_file_name = 'browser_config.json'
-script_directory = os.path.dirname(os.path.realpath(__file__))
-json_file_directory = os.path.join(script_directory, 'KB-Mosaicore-Core')
-json_file_path = os.path.join(json_file_directory, json_file_name)
-print(f"JSON file path: {json_file_path}")
 
-def find_mosaicore_executable(executable_name="Mosaicore.exe"):
-    executable_path = os.path.join(json_file_directory, executable_name)
-    print(f"CHECKING: {executable_path}")
-    return executable_path if os.path.isfile(executable_path) else None 
+# Configuration for the JSON file path
+script_directory = os.path.dirname(os.path.realpath(__file__))
+json_file_directory = os.path.join(script_directory, 'KB-Mosaicore')
+json_file_name = 'browser_config.json'
+json_file_path = os.path.join(json_file_directory, json_file_name)
+
+# Common browser installation paths
+browser_paths = [
+    "Program Files\\Google\\Chrome\\Application\\chrome.exe",
+    "Program Files\\Mozilla Firefox\\firefox.exe",
+    "Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+    "Program Files\\Opera\\launcher.exe",
+    "Program Files\\BraveSoftware\\Brave-Browser\\Application\\brave.exe"
+]
+
+def find_mosaicore_executable(directory, executable_name="Mosaicore.exe"):
+    # Logic to find the Mosaicore executable
+    executable_path = os.path.join(directory, executable_name)
+    return executable_path if os.path.isfile(executable_path) else None
 
 def get_default_data():
-    mosaicore_path = find_mosaicore_executable() or 'Path to Mosaicore not found'
+    mosaicore_path = find_mosaicore_executable(json_file_directory) or 'Path to Mosaicore not found'
     return {
         'browsers': [
             {
@@ -10990,32 +11000,19 @@ def get_default_data():
         ]
     }
 
-    
 def get_available_drives():
     drives = []
     for drive_letter in string.ascii_uppercase:
-        #print(f"Checking: {drive_letter}")
-        if os.path.exists(f"{drive_letter}:\\"):
-            drives.append(f"{drive_letter}:\\")
+        drive_path = f"{drive_letter}:\\"
+        if os.path.exists(drive_path):
+            drives.append(drive_path)
     return drives
 
-
-# Common browser installation paths to check on each drive
-browser_paths = [
-    r"Program Files\Google\Chrome\Application\chrome.exe",
-    r"Program Files\Mozilla Firefox\firefox.exe",
-    r"Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
-    r"Program Files\Opera\launcher.exe",
-    r"Program Files\BraveSoftware\Brave-Browser\Application\brave.exe"
-]
-
-# Detect installed browsers
 def detect_browsers():
     detected_browsers = []
     for drive in get_available_drives():
-        for path in browser_paths:
-            full_path = os.path.join(drive, path)
-            #print(f"Checking: {full_path}")  # Print the path being checked
+        for browser_path in browser_paths:
+            full_path = os.path.join(drive, browser_path)
             if os.path.isfile(full_path):
                 browser_name = os.path.basename(os.path.dirname(os.path.dirname(full_path)))
                 detected_browsers.append({
@@ -11023,152 +11020,76 @@ def detect_browsers():
                     "executable_name": browser_name,
                     "status": None
                 })
-                print(f"Detected: {browser_name}")  # Print detected browser
     return detected_browsers
-    
 
+def manage_json_file(operation, data=None):
+    if operation == 'read':
+        if os.path.exists(json_file_path) and os.path.getsize(json_file_path) > 0:
+            with open(json_file_path, 'r') as file:
+                return json.load(file)
+        else:
+            default_data = get_default_data()
+            detected_browsers = detect_browsers()
+            # Merge detected browsers with the default data
+            for browser in detected_browsers:
+                if not any(b['executable_name'] == browser['executable_name'] for b in default_data['browsers']):
+                    default_data['browsers'].append(browser)
+            manage_json_file('write', default_data)
+            return default_data  # Return the newly created data
+    elif operation == 'write' and data is not None:
+        with open(json_file_path, 'w') as file:
+            json.dump(data, file, indent=4)
+            print("JSON data successfully written to file.")
 
-def ensure_default_file_exists():
-    # Ensure the directory exists
+@app.route('/update_browser_setting', methods=['POST'])
+def update_browser_setting():
+    data = request.get_json()
+    selected_browser_path = data['browserPath']
+
+    json_data = manage_json_file('read')
+
+    # Update the browser setting in json_data
+    for browser in json_data['browsers']:
+        browser['status'] = 'selected' if browser['executable_path'] == selected_browser_path else None
+
+    manage_json_file('write', json_data)
+    return jsonify({'status': 'success'})
+
+def open_in_browser(url, port):
+    json_data = manage_json_file('read')
+    selected_browser = next((b for b in json_data['browsers'] if b['status'] == 'selected'), None)
+
+    if selected_browser:
+        browser_path = selected_browser['executable_path']
+        if os.path.isfile(browser_path):
+            os.system(f'"{browser_path}" {url.format(port)}')
+        else:
+            print(f"Executable path not found: {browser_path}")
+    else:
+        print("No selected browser found in JSON.")
+
+def initialize_app():
+    # Ensure the JSON file directory exists
     if not os.path.exists(json_file_directory):
         os.makedirs(json_file_directory)
 
-    # Check and create file if necessary
+    # Check for the JSON file and create it with default data if necessary
     if not os.path.exists(json_file_path) or os.path.getsize(json_file_path) == 0:
         default_data = get_default_data()
-        detected_browsers = detect_browsers()  # Detect installed browsers
-
-        # Add detected browsers to the default data
+        detected_browsers = detect_browsers()
+        
+        # Merge detected browsers with the default data
         for browser in detected_browsers:
             if not any(b['executable_name'] == browser['executable_name'] for b in default_data['browsers']):
                 default_data['browsers'].append(browser)
 
-        with open(json_file_path, 'w') as file:
-            json.dump(default_data, file, indent=4)
-        print(f"Default JSON file created at {json_file_path}.")
+        manage_json_file('write', default_data)
 
+@app.route('/get_browsers')
+def get_browsers():
+    json_data = manage_json_file('read')
+    return jsonify(json_data['browsers'])
 
-#Ensure Function called
-ensure_default_file_exists()
-
-def get_user_browser_choice():
-    global json_file_path
-    print(f"get_user_browser_choice - Checking JSON file at: {json_file_path}")
-    try:
-        with open(json_file_path, 'r') as file:
-            data = json.load(file)
-            for browser in data['browsers']:
-                if browser['status'] == 'selected':
-                    return browser['executable_name']
-            return 'Mosaicore'  # Default to Mosaicore if no browser is selected
-    except FileNotFoundError:
-        print("No File Found - Default Browser Enabled")
-        return 'Mosaicore'  # Default to Mosaicore if the file doesn't exist
-
-
-def open_in_browser(url, port):
-    global json_file_path
-    print(f"open_in_browser - Checking JSON file at: {json_file_path}")
-    try:
-        with open(json_file_path, 'r') as file:
-            data = json.load(file)
-            browser_path = next((b['executable_path'] for b in data['browsers'] if b['executable_name'] == "Mosaicore"), None)
-
-            if browser_path:
-                # Check if the path is valid
-                if os.path.isfile(browser_path):
-                    # Open the URL using the absolute path of the browser executable
-                    os.system(f'"{browser_path}" {url.format(port)}')
-                else:
-                    print(f"Executable path for Mosaicore not found: {browser_path}")
-            else:
-                print(f"Mosaicore path not found in JSON.")
-
-    except FileNotFoundError:
-        print("Executable info file not found.")
-
-
-def update_browsers_list(data):
-    mosaicore_path = find_mosaicore_executable()
-    print(f"CHECKING: {mosaicore_path}")  # Use print to output the debugging information
-    if mosaicore_path:
-        # Check if Mosaicore is already in the data
-        if not any(browser['executable_name'] == "Mosaicore" for browser in data['browsers']):
-            data['browsers'].append({
-                "executable_path": mosaicore_path,
-                "executable_name": "Mosaicore",
-                "status": None  # or 'selected' if you want it to be the default selected
-            })
-
-    # Add other detected browsers
-    for browser in detect_browsers():
-        if not any(b['executable_name'] == browser['executable_name'] for b in data['browsers']):
-            data['browsers'].append(browser)
-    return data
-
-
-def read_json(json_file_path):
-    if os.path.exists(json_file_path) and os.path.getsize(json_file_path) > 0:
-        with open(json_file_path, 'r') as file:
-            return json.load(file)
-    else:
-        default_data = get_default_data()
-        with open(json_file_path, 'w') as file:
-            json.dump(default_data, file, indent=4)
-        return default_data
-
-
-def write_json(data, json_file_path):
-    try:
-        with open(json_file_path, 'w') as file:
-            json.dump(data, file, indent=4)
-        print("JSON data successfully written to file.")
-    except PermissionError as e:
-        print(f"Permission error: {e}")
-    except Exception as e:
-        print(f"Unexpected error while writing JSON: {e}")
-
-
-def extract_executable_name(path):
-    base = os.path.basename(path)
-    return os.path.splitext(base)[0]
-
-
-@app.route('/', methods=['GET', 'POST'])
-def indexx():
-    global json_file_path
-    data = read_json(json_file_path)  # Read the existing data
-    data = update_browsers_list(data)  # Update the data with detected browsers
-    write_json(data, json_file_path)  # Immediately write the updated data back to the file
-
-    if request.method == 'POST':
-        browser_choice = request.form.get('browser')
-        data = read_json(json_file_path)  # Re-read the data to get the latest updates
-
-        # Update the status of all browsers to null initially
-        for browser in data['browsers']:
-            browser['status'] = None
-
-        if browser_choice == "Custom":
-            custom_path = request.form.get('executablePath')
-            if custom_path:
-                executable_name = extract_executable_name(custom_path)
-                custom_browser = {
-                    "executable_path": custom_path,
-                    "executable_name": executable_name,
-                    "status": "selected"
-                }
-                data['browsers'].append(custom_browser)
-        else:
-            # Find the selected browser and update its status
-            for browser in data['browsers']:
-                if browser['executable_name'] == browser_choice:
-                    browser['status'] = "selected"
-                    break
-
-        write_json(data, json_file_path)  # Write the updated data back to the file after POST handling
-
-    return render_template('settings flyout.html', data=read_json(json_file_path))  
 
 
 #==================================================================#

@@ -493,3 +493,59 @@
 		<a onclick='openPopup("version-popup");' class='cursor'>Version</a>
 	</div>
 </div>
+
+<script>
+	// ABYSSAL MODIFICATIONS
+		
+	function updateBrowserSetting(item) {
+		let selectedBrowserPath = item.value;
+		// Make an AJAX call to a Flask route
+		
+		$.ajax({
+			url: '/update_browser_setting',  // Flask route
+			type: 'POST',
+			contentType: 'application/json',
+			data: JSON.stringify({ browserPath: selectedBrowserPath }),
+			success: function(response) {
+				// Handle success (maybe display a message to the user)
+			},
+			error: function(error) {
+				// Handle error (alert the user about the failure)
+			}
+		});
+		console.log("Sending data to server:", JSON.stringify({ browserPath: selectedBrowserPath }));
+	}
+	
+	// Populates browser dropdown on first load. 
+	// Without this function the program must be relaunched for browsers to display on initial creation.
+	function populateBrowserDropdown() {
+		$.ajax({
+			url: '/get_browsers',
+			type: 'GET',
+			success: function(browsers) {
+				let dropdown = $('#browser_setting_selected_browser'); // This dropdown ID is the one generated in settings item.html
+				dropdown.empty(); // Clear existing options
+	
+				// Add browsers to the dropdown
+				$.each(browsers, function(index, browser) {
+					dropdown.append($('<option>', {
+						value: browser.executable_path,
+						text: browser.executable_name,
+						selected: browser.status === 'selected'
+					}));
+				});
+			},
+			error: function(error) {
+				console.error("Error loading browsers: ", error);
+			}
+		});
+	}
+	
+	// Called on page load
+	$(document).ready(function() {
+		populateBrowserDropdown();
+	});
+	
+	// ABYSSAL MODIFICATIONS
+	</script>
+	

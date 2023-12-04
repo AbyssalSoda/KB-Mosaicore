@@ -1,3 +1,27 @@
+## Abyssal Modifications
+
+import os
+import json
+
+def get_browser_options():
+    script_directory = os.path.dirname(os.path.realpath(__file__))
+    json_file_directory = os.path.join(script_directory, 'KB-Mosaicore')
+    json_file_name = 'browser_config.json'
+    json_path = os.path.join(json_file_directory, json_file_name)
+    
+    # Check if the file exists
+    if not os.path.exists(json_path):
+        print("Does not exist")
+        return []
+
+    # If the file exists, proceed to open and read it
+    with open(json_path, 'r') as file:
+        data = json.load(file)
+        return [{'text': browser['executable_name'], 'value': browser['executable_path']} for browser in data['browsers']]
+
+## Abyssal Modifications
+# Lists
+
 gensettingstf = [
 	{
 	"uitype": "slider",
@@ -1362,3 +1386,24 @@ formatcontrols = [{
     "id": "singleline",
     "tooltip": "Allows the AI to generate an output only before the enter."
     }]
+
+## Abyssal Modifications
+
+browser_dropdown_setting = {
+    "uitype": "browserdropdown",
+    "unit": "text",
+    "label": "Web Browser",
+    "id": "browser_dropdown",
+    "default": 0,
+    "tooltip": "Set a default Web Browser. Changes take effect upon restart.",
+    "menu_path": "Home",
+    "sub_path": "",
+    "classname": "browser_setting",
+    "name": "selected_browser",
+    'children': get_browser_options(),
+    "ui_level": 0
+}
+
+gensettingstf.append(browser_dropdown_setting)
+
+## Abyssal Modifications

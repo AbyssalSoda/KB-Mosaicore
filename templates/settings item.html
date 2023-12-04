@@ -30,6 +30,18 @@
 					<option value="{{ option['value'] }}">{{ option["text"] }}</option>
 				{% endfor %}
 			</select>
+
+		<!---Abyssal Modifications---->	
+		<!---Note class is default css, while item info is linked with gensettings list---->	
+		{% elif item['uitype'] == "browserdropdown" %}
+			<select id="{{ item['classname'] }}_{{ item['name'] }}" class="settings_select" onchange='updateBrowserSetting(this);'>
+				{% for option in item['children'] %}
+					<option value="{{ option['value'] }}">{{ option["text"] }}</option>
+				{% endfor %}
+			</select>
+
+		<!---Abyssal Modifications---->	
+
 		{% elif item['uitype'] == "password" %}
 			<input type=password id="{{ item['classname'] }}_{{ item['name'] }}" class="settings_select var_sync_{{ item['classname'] }}_{{ item['name'] }}" onchange='sync_to_server(this);' value='{{ item['default'] }}'>
 		{% elif item['uitype'] == "text" %}
