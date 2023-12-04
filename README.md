@@ -2,10 +2,9 @@
 All modifications to code will be marked with the keyword: Abyssal Modifications
 
 New Default Mosaicore Browser (Dark & Light/System Theme Mode supported)
-Default Browser Select (Choose what browser you want)
+Default Browser Select
 
-<img width="443" alt="zxzxcxzzxc" src="https://github.com/AbyssalSoda/KB-Mosaicore/assets/122791105/b122706c-856c-4888-9f5e-bbb2fde4d28b">
-
+<img width="500" alt="jhkjh" src="https://github.com/AbyssalSoda/KB-Mosaicore/assets/122791105/f777408f-61f5-41c1-b0db-6dc509ee83bd">
 
 ## KoboldAI - Your gateway to GPT writing
 
