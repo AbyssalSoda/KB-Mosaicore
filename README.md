@@ -4,6 +4,9 @@ All modifications to code will be marked with the keyword: Abyssal Modifications
 New Default Mosaicore Browser (Dark & Light/System Theme Mode supported)
 Default Browser Select (Choose what browser you want)
 
+<img width="443" alt="zxzxcxzzxc" src="https://github.com/AbyssalSoda/KB-Mosaicore/assets/122791105/b122706c-856c-4888-9f5e-bbb2fde4d28b">
+
+
 ## KoboldAI - Your gateway to GPT writing
 
 This is a browser-based front-end for AI-assisted writing with multiple local & remote AI models. It offers the standard array of tools, including Memory, Author's Note, World Info, Save & Load, adjustable AI settings, formatting options, and the ability to import existing AI Dungeon adventures. You can also turn on Adventure mode and play the game like AI Dungeon Unleashed.
